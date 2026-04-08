@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
-import AppRoutes from "./routes/AppRoutes";
+import App from "./App";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./app/store";
@@ -13,8 +13,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <AppRoutes />
-          <Toaster />
+          <App />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: { fontSize: "14px", borderRadius: "10px" },
+            }}
+          />
         </AuthProvider>
       </QueryClientProvider>
     </BrowserRouter>

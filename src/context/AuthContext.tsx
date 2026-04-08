@@ -1,46 +1,57 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, type ReactNode } from "react";
+import { api } from "../api/axios";
+import type { User, Role } from "../types";
 
-type Role = "ADMIN" | "USER" | null;
-
-interface AuthType {
-  role: Role;
+interface AuthContextType {
+  user: User | null;
+  role: Role | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => void;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
-export const AuthContext = createContext<AuthType>(null!);
+export const AuthContext = createContext<AuthContextType>(null!);
 
-export const AuthProvider = ({ children }: any) => {
-  const [role, setRole] = useState<Role>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(() => {
+    try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
+  });
+
+  const role: Role | null = user?.role ?? null;
 
   useEffect(() => {
-    const saved = localStorage.getItem("role");
-    if (saved) setRole(saved as Role);
+    const token = localStorage.getItem("token");
+    const saved = localStorage.getItem("user");
+    if (token && saved) {
+      try { setUser(JSON.parse(saved)); } catch { /* ignore */ }
+    }
   }, []);
 
-  const login = (email: string, password: string) => {
-    if (email === "admin@admin.com" && password === "admin123") {
-      setRole("ADMIN");
-      localStorage.setItem("role", "ADMIN");
-    } else {
-      setRole("USER");
-      localStorage.setItem("role", "USER");
-    }
+  const login = async (email: string, password: string) => {
+    const res = await api.post("/auth/users/login", { email, password });
+    const { token, user: apiUser } = res.data.data;
+    // The API cannot assign ADMIN role via registration, so we decode the JWT
+    // to get the real role the server signed into the token
+    let role: Role = apiUser.role;
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (payload.role) role = payload.role;
+    } catch { /* use apiUser.role as fallback */ }
+    const u: User = { ...apiUser, role };
+    setUser(u);
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(u));
   };
 
   const logout = () => {
-    setRole(null);
-    localStorage.removeItem("role");
+    setUser(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("cart");
   };
 
   return (
-    <AuthContext.Provider value={{
-      role,
-      isAuthenticated: !!role,
-      login,
-      logout
-    }}>
+    <AuthContext.Provider value={{ user, role, isAuthenticated: !!user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
